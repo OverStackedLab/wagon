@@ -1,6 +1,7 @@
 package filelist
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -134,6 +135,42 @@ func ResolveLocal(localPath string) (string, error) {
 	return filepath.Abs(localPath)
 }
 
+func SizeLocal(ctx context.Context, localPath string) (int64, error) {
+	resolved, err := ResolveLocal(localPath)
+	if err != nil {
+		return 0, err
+	}
+
+	var total int64
+	err = filepath.WalkDir(resolved, func(_ string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if entry.IsDir() {
+			return nil
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return nil
+		}
+		if info.Mode().IsRegular() {
+			total += info.Size()
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 func FromRemoteEntries(remotePath string, entries []rclone.Entry) []Item {
 	items := make([]Item, 0, len(entries))
 	for _, entry := range entries {
@@ -200,14 +237,22 @@ func RemoteParent(remotePath string) string {
 }
 
 func FormatSize(item Item) string {
-	if item.IsDir {
+	if item.IsParent {
 		return "-"
 	}
 	if !item.SizeKnown {
 		return "?"
 	}
 
-	size := float64(item.Size)
+	return FormatBytes(item.Size)
+}
+
+func FormatBytes(bytes int64) string {
+	if bytes < 0 {
+		return "?"
+	}
+
+	size := float64(bytes)
 	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
 	unit := 0
 	for size >= 1024 && unit < len(units)-1 {
@@ -215,7 +260,7 @@ func FormatSize(item Item) string {
 		unit++
 	}
 	if unit == 0 {
-		return fmt.Sprintf("%d %s", item.Size, units[unit])
+		return fmt.Sprintf("%d %s", bytes, units[unit])
 	}
 	return fmt.Sprintf("%.1f %s", size, units[unit])
 }

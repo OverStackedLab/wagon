@@ -23,6 +23,12 @@ type Entry struct {
 	IsDir   bool   `json:"IsDir"`
 }
 
+type SizeResult struct {
+	Count  int64 `json:"count"`
+	Bytes  int64 `json:"bytes"`
+	Errors int64 `json:"errors"`
+}
+
 func NewClient() Client {
 	return Client{bin: "rclone"}
 }
@@ -93,6 +99,19 @@ func (c Client) CopyItem(ctx context.Context, source string, destination string,
 		args = []string{"copy", source, destination}
 	}
 	return c.RunOutput(ctx, args...)
+}
+
+func (c Client) Size(ctx context.Context, target string) (SizeResult, error) {
+	output, err := c.combined(ctx, "size", "--json", target)
+	if err != nil {
+		return SizeResult{}, err
+	}
+
+	var result SizeResult
+	if err := json.Unmarshal(output, &result); err != nil {
+		return SizeResult{}, fmt.Errorf("parse rclone size output: %w", err)
+	}
+	return result, nil
 }
 
 func (c Client) RunOutput(ctx context.Context, args ...string) (string, error) {

@@ -52,6 +52,8 @@ type Model struct {
 	autoPickRemote bool
 	copying        bool
 	transfer       transferState
+	sizing         bool
+	sizeJob        sizeState
 	searchMode     bool
 	drivePicker    bool
 	driveCursor    int
@@ -78,17 +80,40 @@ type copyStepFinishedMsg struct {
 	err         error
 }
 
+type sizeStepFinishedMsg struct {
+	paneIndex int
+	paneKind  filelist.Kind
+	panePath  string
+	itemIndex int
+	itemPath  string
+	itemName  string
+	size      int64
+	err       error
+}
+
 type transferTickMsg struct{}
 
 type transferState struct {
-	sourceIndex int
-	targetIndex int
-	targetPath  string
-	targetKind  filelist.Kind
-	items       []filelist.Item
-	current     int
-	spinner     int
-	started     time.Time
+	sourceIndex    int
+	targetIndex    int
+	targetPath     string
+	targetKind     filelist.Kind
+	items          []filelist.Item
+	current        int
+	spinner        int
+	started        time.Time
+	pauseRequested bool
+	paused         bool
+}
+
+type sizeState struct {
+	paneIndex int
+	panePath  string
+	paneKind  filelist.Kind
+	items     []filelist.Item
+	current   int
+	failed    int
+	started   time.Time
 }
 
 type driveChoice struct {
@@ -232,7 +257,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadPane(1)
 
 	case transferTickMsg:
-		if !m.copying {
+		if !m.copying || m.transfer.paused {
 			return m, nil
 		}
 		m.transfer.spinner = (m.transfer.spinner + 1) % len(spinnerFrames)
@@ -250,6 +275,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if nextIndex < total {
 			m.transfer.current = nextIndex
 			currentItem := m.transfer.items[nextIndex]
+			if m.transfer.pauseRequested {
+				m.transfer.pauseRequested = false
+				m.transfer.paused = true
+				m.status = fmt.Sprintf("Paused before %d/%d: %s. Press p to resume.", nextIndex+1, total, currentItem.Name)
+				return m, nil
+			}
 			m.status = fmt.Sprintf("Copying %d/%d: %s", nextIndex+1, total, currentItem.Name)
 			return m, m.copyTransferItem(nextIndex)
 		}
@@ -261,6 +292,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.panes[msg.targetIndex].err = nil
 		m.status = fmt.Sprintf("Copied %d item(s).", total)
 		return m, m.loadPane(msg.targetIndex)
+
+	case sizeStepFinishedMsg:
+		if !m.sizing {
+			return m, nil
+		}
+		if !m.matchesSizeJob(msg) {
+			m.sizing = false
+			m.status = "Size calculation stopped because the pane changed."
+			return m, nil
+		}
+
+		if msg.err != nil {
+			m.sizeJob.failed++
+			m.status = "Size failed for " + msg.itemName + ": " + msg.err.Error()
+		} else {
+			setItemSize(&m.panes[msg.paneIndex], msg.itemPath, msg.size)
+		}
+
+		total := len(m.sizeJob.items)
+		nextIndex := msg.itemIndex + 1
+		if nextIndex < total {
+			m.sizeJob.current = nextIndex
+			currentItem := m.sizeJob.items[nextIndex]
+			if msg.err == nil {
+				m.status = fmt.Sprintf("Sizing %d/%d: %s", nextIndex+1, total, currentItem.Name)
+			}
+			return m, m.sizeTransferItem(nextIndex)
+		}
+
+		m.sizing = false
+		m.sizeJob.current = total
+		if m.sizeJob.failed > 0 {
+			m.status = fmt.Sprintf("Sized %d item(s), %d failed.", total-m.sizeJob.failed, m.sizeJob.failed)
+			return m, nil
+		}
+		m.status = fmt.Sprintf("Sized %d item(s).", total)
+		return m, nil
 
 	case paneLoadedMsg:
 		if msg.index < 0 || msg.index >= len(m.panes) {
@@ -321,6 +389,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.loadPane(m.active)
 		case "c":
 			return m, m.copyCurrentSelection()
+		case "p":
+			return m, m.toggleTransferPause()
+		case "z":
+			return m, m.sizeCurrentSelection()
 		case "v":
 			m.openDrivePicker()
 			return m, nil
@@ -328,7 +400,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "TUI sync is next. For now use: wagon sync <source> <destination>"
 			return m, nil
 		case "?":
-			m.status = "Keys: / search, Tab pane, Enter open, Space select, c copy, v drives, a all, A clear, r refresh, q quit."
+			m.status = "Keys: / search, Tab pane, Enter open, Space select, c copy, p pause/resume, z size, v drives, a all, A clear, r refresh, q quit."
 			return m, nil
 		}
 	}
@@ -462,7 +534,7 @@ func (m Model) renderItemLine(p pane, item filelist.Item, cursor bool, width int
 func (m Model) renderFooter(width int) string {
 	active := m.activePane()
 	selection := fmt.Sprintf("%s: %d selected", active.title, countSelected(*active))
-	help := "[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [v] drives  [a] all  [A] clear  [r] refresh  [?] help  [q] quit"
+	help := "[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [p] pause  [z] size  [v] drives  [q] quit"
 	lines := []string{
 		mutedStyle.Render(truncate(selection, width)),
 		truncate(m.status, width),
@@ -479,16 +551,25 @@ func (m Model) renderTransfer(width int) string {
 	current := clamp(m.transfer.current, 0, len(m.transfer.items)-1)
 	item := m.transfer.items[current]
 	frame := spinnerFrames[m.transfer.spinner%len(spinnerFrames)]
+	action := "Copying"
+	if m.transfer.paused {
+		frame = "||"
+		action = "Paused before"
+	} else if m.transfer.pauseRequested {
+		action = "Copying (pause requested)"
+	}
 	elapsed := time.Since(m.transfer.started).Round(time.Second)
 	if elapsed < 0 {
 		elapsed = 0
 	}
 
-	label := fmt.Sprintf("%s Copying item %d/%d: %s -> %s  elapsed %s",
+	label := fmt.Sprintf("%s %s item %d/%d: %s  size %s  -> %s  elapsed %s",
 		frame,
+		action,
 		current+1,
 		len(m.transfer.items),
 		item.Name,
+		transferSizeSummary(item, m.transfer.items),
 		m.transfer.targetPath,
 		elapsed,
 	)
@@ -800,6 +881,34 @@ func (m *Model) copyCurrentSelection() tea.Cmd {
 	return tea.Batch(m.copyTransferItem(0), transferTick())
 }
 
+func (m *Model) toggleTransferPause() tea.Cmd {
+	if !m.copying || len(m.transfer.items) == 0 {
+		m.status = "No transfer running."
+		return nil
+	}
+
+	total := len(m.transfer.items)
+	current := clamp(m.transfer.current, 0, total-1)
+	item := m.transfer.items[current]
+
+	if m.transfer.paused {
+		m.transfer.paused = false
+		m.transfer.pauseRequested = false
+		m.status = fmt.Sprintf("Resuming %d/%d: %s", current+1, total, item.Name)
+		return tea.Batch(m.copyTransferItem(current), transferTick())
+	}
+
+	if m.transfer.pauseRequested {
+		m.transfer.pauseRequested = false
+		m.status = "Pause canceled."
+		return nil
+	}
+
+	m.transfer.pauseRequested = true
+	m.status = "Pause requested. Current item will finish first."
+	return nil
+}
+
 func (m Model) copyTransferItem(itemIndex int) tea.Cmd {
 	client := m.client
 	ctx := m.ctx
@@ -825,6 +934,91 @@ func (m Model) copyTransferItem(itemIndex int) tea.Cmd {
 			err:         err,
 		}
 	}
+}
+
+func (m *Model) sizeCurrentSelection() tea.Cmd {
+	if m.sizing {
+		m.status = "Size calculation already running."
+		return nil
+	}
+
+	p := m.activePane()
+	if p.loading || p.err != nil {
+		m.status = "Pane is not ready."
+		return nil
+	}
+
+	items := sizeItems(*p)
+	if len(items) == 0 {
+		m.status = "Selected/current item sizes are already known."
+		return nil
+	}
+
+	m.sizing = true
+	m.sizeJob = sizeState{
+		paneIndex: m.active,
+		panePath:  p.path,
+		paneKind:  p.kind,
+		items:     items,
+		current:   0,
+		started:   time.Now(),
+	}
+	m.status = fmt.Sprintf("Sizing 1/%d: %s", len(items), items[0].Name)
+	return m.sizeTransferItem(0)
+}
+
+func (m Model) sizeTransferItem(itemIndex int) tea.Cmd {
+	client := m.client
+	ctx := m.ctx
+	job := m.sizeJob
+
+	return func() tea.Msg {
+		if itemIndex < 0 || itemIndex >= len(job.items) {
+			return sizeStepFinishedMsg{
+				paneIndex: job.paneIndex,
+				paneKind:  job.paneKind,
+				panePath:  job.panePath,
+				itemIndex: itemIndex,
+				err:       fmt.Errorf("size item index %d out of range", itemIndex),
+			}
+		}
+
+		item := job.items[itemIndex]
+		sizeCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
+		var size int64
+		var err error
+		if job.paneKind == filelist.Local {
+			size, err = filelist.SizeLocal(sizeCtx, item.Path)
+		} else {
+			result, sizeErr := client.Size(sizeCtx, item.Path)
+			size = result.Bytes
+			err = sizeErr
+		}
+
+		return sizeStepFinishedMsg{
+			paneIndex: job.paneIndex,
+			paneKind:  job.paneKind,
+			panePath:  job.panePath,
+			itemIndex: itemIndex,
+			itemPath:  item.Path,
+			itemName:  item.Name,
+			size:      size,
+			err:       err,
+		}
+	}
+}
+
+func (m Model) matchesSizeJob(msg sizeStepFinishedMsg) bool {
+	if msg.paneIndex != m.sizeJob.paneIndex || msg.paneKind != m.sizeJob.paneKind || msg.panePath != m.sizeJob.panePath {
+		return false
+	}
+	if msg.paneIndex < 0 || msg.paneIndex >= len(m.panes) {
+		return false
+	}
+	p := m.panes[msg.paneIndex]
+	return p.kind == msg.paneKind && p.path == msg.panePath
 }
 
 func transferTick() tea.Cmd {
@@ -1026,6 +1220,65 @@ func copyItems(p pane) []filelist.Item {
 		}
 	}
 	return items
+}
+
+func sizeItems(p pane) []filelist.Item {
+	if len(p.items) == 0 {
+		return nil
+	}
+
+	if len(p.selected) == 0 {
+		item, ok := currentVisibleItem(p)
+		if !ok || item.IsParent || item.SizeKnown {
+			return nil
+		}
+		return []filelist.Item{item}
+	}
+
+	items := make([]filelist.Item, 0, len(p.selected))
+	for _, item := range p.items {
+		if p.selected[item.Path] && !item.IsParent && !item.SizeKnown {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func setItemSize(p *pane, itemPath string, size int64) {
+	for index := range p.items {
+		if p.items[index].Path == itemPath {
+			p.items[index].Size = size
+			p.items[index].SizeKnown = true
+			return
+		}
+	}
+}
+
+func transferSizeSummary(current filelist.Item, items []filelist.Item) string {
+	currentSize := filelist.FormatSize(current)
+	if len(items) <= 1 {
+		return currentSize
+	}
+
+	var total int64
+	unknown := 0
+	for _, item := range items {
+		if item.SizeKnown {
+			total += item.Size
+		} else {
+			unknown++
+		}
+	}
+
+	if total == 0 && unknown > 0 {
+		return currentSize + " / ?"
+	}
+
+	batchSize := filelist.FormatBytes(total)
+	if unknown > 0 {
+		batchSize += "+?"
+	}
+	return currentSize + " / " + batchSize
 }
 
 func dropLastRune(value string) string {

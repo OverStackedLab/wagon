@@ -78,6 +78,8 @@ wagon sync <source> <destination> --apply --yes
 - `Space`: select or unselect item
 - `/`: search/filter the active pane as you type
 - `c`: copy selected/current item into the opposite pane
+- `p`: pause or resume the active transfer queue after the current item
+- `z`: calculate the size of the selected/current folder or unknown-size item
 - `v`: choose a local drive or location for the active pane
 - `Esc`: clear search or close the drive picker
 - `a`: select all
@@ -90,7 +92,9 @@ The browser supports copying between any two loaded locations: local-to-local, l
 
 Search is incremental: press `/`, type part of a file or folder name, and the active pane filters immediately. `Enter` opens the highlighted match, arrow keys move through matches, and `Esc` clears the search.
 
-Browser copy shows an item-level progress strip while copying, including a spinner, current item count, current filename, destination, and elapsed time. Byte-level `rclone` progress is still available in CLI copy output and is planned for the TUI transfer queue.
+Browser copy shows an item-level progress strip while copying, including a spinner, current item count, current filename, current item size, known batch size, destination, and elapsed time. Press `p` during a copy to pause the queue after the current item finishes, then press `p` again to resume. Byte-level `rclone` progress is still available in CLI copy output and is planned for the TUI transfer queue.
+
+Folder sizes are calculated on demand because recursive local walks and remote `rclone size` calls can be slow. Folders show `?` until you select one or move the cursor to it and press `z`.
 
 Sync is still available as a CLI command while the transfer queue and in-browser sync actions are built out.
 

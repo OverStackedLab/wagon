@@ -26,8 +26,10 @@ Implemented:
 - Local drive picker with `v`, listing `/`, home, and mounted drives under `/Volumes`.
 - Incremental per-pane search with `/`, live filtering, Enter-open, and Esc-clear.
 - Multi-select with `Space`, `a`, and `A`.
+- On-demand folder size calculation with `z` for local folders and remotes.
 - Browser copy with `c` between local and remote locations through `rclone`.
-- Browser copy progress strip with spinner, item count, filename, destination, and elapsed time.
+- Pause/resume for browser copy queues with `p`, pausing between transfer items.
+- Browser copy progress strip with spinner, item count, filename, size, destination, and elapsed time.
 - CLI sync dry-run by default, with `--apply` and `--yes`.
 
 Not yet implemented:
@@ -82,6 +84,7 @@ Acceptance:
 - User can choose a mounted drive from inside the UI.
 - User can still browse an `rclone` remote with `--remote` or `--right remote:`.
 - User can filter the active pane as they type and open a matching folder with `Enter`.
+- User can calculate selected/current folder sizes on demand.
 - The app handles empty folders, inaccessible folders, and missing remotes gracefully.
 
 ## Milestone 2: Selection Model

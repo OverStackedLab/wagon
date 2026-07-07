@@ -54,7 +54,9 @@ The current app is a Go CLI/TUI with these working features:
 - `/` starts incremental search in the active pane and filters matches as the user types.
 - Multi-select works with `Space`, `a`, and `A`.
 - `c` copies the selected/current item into the opposite pane using `rclone`.
-- Browser copy shows an item-level progress strip with a spinner, current item count, filename, destination, and elapsed time.
+- `p` pauses or resumes an active browser copy queue after the current item finishes.
+- `z` calculates the selected/current folder size on demand.
+- Browser copy shows an item-level progress strip with a spinner, current item count, filename, size, destination, and elapsed time.
 - `wagon copy` supports local and remote paths, with `--dry-run`.
 - `wagon sync` is dry-run by default; `--apply` performs the sync and `--yes` skips confirmation.
 
@@ -78,9 +80,9 @@ Wagon                                                   rclone file manager
  Local: 0 selected
  Tab switches panes. / searches. Enter opens folders. v chooses a drive.
 
- / Copying item 2/5: tax-2025.pdf -> /Volumes/Backup  elapsed 3s
+ / Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -> /Volumes/Backup  elapsed 3s
 
- [/] search   [Tab] pane   [Enter] open   [Space] select   [c] copy   [v] drives
+ [/] search   [Tab] pane   [Enter] open   [Space] select   [c] copy   [p] pause   [z] size   [v] drives
 ```
 
 ### Drive Picker
@@ -150,6 +152,8 @@ wagon sync ~/Pictures b2:photos --apply
 - `Space`: select or unselect current item
 - `/`: search/filter the active pane as you type
 - `c`: copy selected/current item into the opposite pane
+- `p`: pause or resume the active transfer queue after the current item
+- `z`: calculate the size of the selected/current folder or unknown-size item
 - `v`: choose a local drive or location for the active pane
 - `Esc`: clear search or close the drive picker
 - `a`: select all
@@ -169,6 +173,7 @@ wagon sync ~/Pictures b2:photos --apply
 
 - Browser copy operations run immediately.
 - Browser copy progress is item-level in the current TUI; byte-level progress is planned for the transfer queue.
+- Browser copy can pause between transfer items with `p`; the current `rclone` item is allowed to finish first.
 - Move operations require confirmation.
 - Delete operations require confirmation and should show item count.
 - CLI sync operations default to dry-run preview before execution.
@@ -192,6 +197,7 @@ wagon sync ~/Pictures b2:photos --apply
 - Path
 - Is directory
 - Size, if known
+- Size calculation state: unknown sizes display as `?` until calculated
 - Modified time, if known
 - Source location
 - Selection state

@@ -22,19 +22,19 @@
   <text x="78" y="214" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">  Name                         Size      Date</text>
   <text x="78" y="240" fill="#ffffff" font-family="Menlo, Consolas, monospace" font-size="13">&gt; x tax-2025.pdf              2.4 MB    Jul 07</text>
   <text x="78" y="264" fill="#22c55e" font-family="Menlo, Consolas, monospace" font-size="13">  x tax-notes.md               18 KB     Jul 07</text>
-  <text x="78" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    tax-archive/               -         Jul 06</text>
+  <text x="78" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    tax-archive/               ?         Jul 06</text>
   <text x="78" y="340" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">2 selected - 3 match(es)</text>
 
   <text x="512" y="214" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">  Name                         Size      Date</text>
   <text x="512" y="240" fill="#ffffff" font-family="Menlo, Consolas, monospace" font-size="13">&gt;   ../                       -         -</text>
-  <text x="512" y="264" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Documents/                 -         Jul 07</text>
-  <text x="512" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Photos/                    -         Jul 05</text>
-  <text x="512" y="312" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Backups/                   -         Jul 01</text>
+  <text x="512" y="264" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Documents/                 ?         Jul 07</text>
+  <text x="512" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Photos/                    4.8 GB    Jul 05</text>
+  <text x="512" y="312" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Backups/                   ?         Jul 01</text>
   <text x="512" y="340" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">0 selected</text>
 
   <rect x="58" y="406" width="844" height="32" rx="4" fill="#1e293b"/>
-  <text x="78" y="427" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: tax-2025.pdf -&gt; /Volumes/Backup  elapsed 3s</text>
+  <text x="78" y="427" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -&gt; /Volumes/Backup  elapsed 3s</text>
 
   <text x="58" y="464" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">Local: 2 selected</text>
-  <text x="58" y="488" fill="#94a3b8" font-family="Menlo, Consolas, monospace" font-size="13">[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [v] drives  [q] quit</text>
+  <text x="58" y="488" fill="#94a3b8" font-family="Menlo, Consolas, monospace" font-size="13">[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [p] pause  [z] size  [v] drives  [q] quit</text>
 </svg>

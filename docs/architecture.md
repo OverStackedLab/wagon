@@ -85,6 +85,7 @@ Wagon's browser state includes:
 - search mode
 - drive picker state
 - copy transfer state
+- folder size calculation state
 - status text
 
 Important functions:
@@ -98,7 +99,9 @@ View                renders the full terminal UI
 renderPane          renders one file pane
 renderTransfer      renders copy progress
 startSearch         starts incremental search
+sizeCurrentSelection calculates selected/current unknown sizes
 copyCurrentSelection starts browser copy
+toggleTransferPause pauses/resumes copy queues between items
 ```
 
 ## File Listing
@@ -270,6 +273,7 @@ After each item completes:
 ```text
 copyStepFinishedMsg
   -> advances to the next item
+  -> pauses before the next item when pause was requested
   -> updates progress state
   -> refreshes destination pane when done
 ```
@@ -277,10 +281,45 @@ copyStepFinishedMsg
 The progress strip is item-level:
 
 ```text
-/ Copying item 2/5: tax-2025.pdf -> /Volumes/Backup  elapsed 3s
+/ Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -> /Volumes/Backup  elapsed 3s
 ```
 
+The first size is the current item. The second size is the known selected-item total; `+?` means at least one selected item still has an unknown size.
+
+Pressing `p` during a copy requests a pause. The current `rclone` item is allowed to finish, then Wagon stops before launching the next queued item. Pressing `p` again resumes from that saved item index.
+
 Byte-level `rclone` progress is currently available in CLI copy output and is planned for the TUI transfer queue.
+
+## Size Flow
+
+Folders show `?` until their size is calculated. This keeps browsing responsive because true folder size requires recursively walking local contents or asking `rclone` to scan a remote path.
+
+When you press `z`:
+
+```text
+Update
+  -> sizeCurrentSelection
+    -> chooses selected unknown-size items, or the current unknown-size item
+    -> starts sizeTransferItem(0)
+```
+
+For local paths:
+
+```text
+sizeTransferItem
+  -> filelist.SizeLocal
+    -> filepath.WalkDir
+```
+
+For remote paths:
+
+```text
+sizeTransferItem
+  -> rclone.Size
+    -> rclone size --json <path>
+```
+
+Each completed size updates the matching item in the active pane if the pane has not navigated away.
 
 ## Drive Picker Flow
 
