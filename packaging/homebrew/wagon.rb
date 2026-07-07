@@ -15,6 +15,6 @@ class Wagon < Formula
 
   test do
     assert_match version.to_s, shell_output("#{bin}/wagon version")
-    assert_match "A terminal file manager for rclone", shell_output("#{bin}/wagon --help")
+    assert_match "Wagon is a terminal file manager", shell_output("#{bin}/wagon --help")
   end
 end
