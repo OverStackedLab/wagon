@@ -16,6 +16,14 @@ brew install rclone go
 rclone config # optional, for cloud remotes
 ```
 
+## Install With Homebrew
+
+After the first release is published, Wagon will install from the OverStackedLab tap:
+
+```bash
+brew install OverStackedLab/tap/wagon
+```
+
 ## Run Locally
 
 ```bash
@@ -85,3 +93,8 @@ Search is incremental: press `/`, type part of a file or folder name, and the ac
 Browser copy shows an item-level progress strip while copying, including a spinner, current item count, current filename, destination, and elapsed time. Byte-level `rclone` progress is still available in CLI copy output and is planned for the TUI transfer queue.
 
 Sync is still available as a CLI command while the transfer queue and in-browser sync actions are built out.
+
+## Project Docs
+
+- [Architecture guide](docs/architecture.md)
+- [Homebrew release guide](docs/homebrew-release.md)

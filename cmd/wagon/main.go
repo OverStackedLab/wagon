@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/jqn/wagon/internal/cli"
+	"github.com/OverStackedLab/wagon/internal/cli"
 )
 
 func main() {

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jqn/wagon/internal/browser"
-	"github.com/jqn/wagon/internal/rclone"
+	"github.com/OverStackedLab/wagon/internal/browser"
+	"github.com/OverStackedLab/wagon/internal/rclone"
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.0-dev"
+var version = "0.1.0-dev"
 
 func Execute(ctx context.Context) error {
 	cmd := NewRootCommand()

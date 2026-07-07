@@ -1,11 +1,14 @@
 PREFIX ?= /opt/homebrew
 BINDIR ?= $(PREFIX)/bin
 BIN := bin/wagon
+MODULE := github.com/OverStackedLab/wagon
+VERSION ?= 0.1.0-dev
+LDFLAGS := -X $(MODULE)/internal/cli.version=$(VERSION)
 
-.PHONY: build install uninstall test
+.PHONY: build install uninstall test release-check
 
 build:
-	go build -o $(BIN) ./cmd/wagon
+	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/wagon
 
 install: build
 	mkdir -p "$(BINDIR)"
@@ -16,3 +19,7 @@ uninstall:
 
 test:
 	go test ./...
+
+release-check: test
+	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/wagon
+	./$(BIN) version

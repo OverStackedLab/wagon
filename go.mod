@@ -1,4 +1,4 @@
-module github.com/jqn/wagon
+module github.com/OverStackedLab/wagon
 
 go 1.26.4
 

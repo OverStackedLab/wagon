@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/OverStackedLab/wagon/internal/filelist"
+	"github.com/OverStackedLab/wagon/internal/rclone"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/jqn/wagon/internal/filelist"
-	"github.com/jqn/wagon/internal/rclone"
 )
 
 type pane struct {

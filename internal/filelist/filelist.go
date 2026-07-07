@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jqn/wagon/internal/rclone"
+	"github.com/OverStackedLab/wagon/internal/rclone"
 )
 
 type Kind int
