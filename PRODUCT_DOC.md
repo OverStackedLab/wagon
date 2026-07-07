@@ -51,8 +51,10 @@ The current app is a Go CLI/TUI with these working features:
 - `--right` opens a local path or remote path in the right pane.
 - `--remote` remains a shortcut for opening a configured `rclone` remote in the right pane.
 - `v` opens a local drive picker for the active pane, listing `/`, home, and mounted drives under `/Volumes`.
+- `/` starts incremental search in the active pane and filters matches as the user types.
 - Multi-select works with `Space`, `a`, and `A`.
 - `c` copies the selected/current item into the opposite pane using `rclone`.
+- Browser copy shows an item-level progress strip with a spinner, current item count, filename, destination, and elapsed time.
 - `wagon copy` supports local and remote paths, with `--dry-run`.
 - `wagon sync` is dry-run by default; `--apply` performs the sync and `--yes` skips confirmation.
 
@@ -74,9 +76,11 @@ Wagon                                                   rclone file manager
 +-----------------------------------+    +-----------------------------------+
 
  Local: 0 selected
- Tab switches panes. Enter opens folders. Space selects. v chooses a drive.
+ Tab switches panes. / searches. Enter opens folders. v chooses a drive.
 
- [Tab] pane   [Enter] open   [Space] select   [c] copy   [v] drives   [q] quit
+ / Copying item 2/5: tax-2025.pdf -> /Volumes/Backup  elapsed 3s
+
+ [/] search   [Tab] pane   [Enter] open   [Space] select   [c] copy   [v] drives
 ```
 
 ### Drive Picker
@@ -89,6 +93,21 @@ Enter opens location. Esc cancels.
   Home           /Users/jqn
   Macintosh HD   /Volumes/Macintosh HD
   Seagate Hub    /Volumes/Seagate Hub
+```
+
+### Incremental Search
+
+```text
+ Local: /Users/jqn/Documents
+ Search: tax_
++------------------------------------------+
+|   Name                 Size      Date     |
+| > tax-2025.pdf         2.4 MB    Jun 22   |
+|   tax-notes.md         18 KB     Jun 10   |
++------------------------------------------+
+
+2 match(es)
+Enter opens the highlighted match. Esc clears search.
 ```
 
 ### Multi-Select
@@ -129,9 +148,10 @@ wagon sync ~/Pictures b2:photos --apply
 - `Enter`: open folder
 - `Backspace`: go up
 - `Space`: select or unselect current item
+- `/`: search/filter the active pane as you type
 - `c`: copy selected/current item into the opposite pane
 - `v`: choose a local drive or location for the active pane
-- `Esc`: close the drive picker
+- `Esc`: clear search or close the drive picker
 - `a`: select all
 - `A`: clear selection
 - `r`: refresh
@@ -140,7 +160,6 @@ wagon sync ~/Pictures b2:photos --apply
 
 ## Planned Keybindings
 
-- `/`: search current pane
 - `m`: move
 - `s`: sync
 - `d`: delete
@@ -149,6 +168,7 @@ wagon sync ~/Pictures b2:photos --apply
 ## Safety Model
 
 - Browser copy operations run immediately.
+- Browser copy progress is item-level in the current TUI; byte-level progress is planned for the transfer queue.
 - Move operations require confirmation.
 - Delete operations require confirmation and should show item count.
 - CLI sync operations default to dry-run preview before execution.
@@ -253,7 +273,7 @@ Implementation notes:
 - A user can select multiple files.
 - A user can copy selected files between any two loaded panes.
 - A user can preview a sync from the CLI before running it.
-- A user can see command-level transfer progress and failures.
+- A user can see item-level browser copy progress and command-level transfer progress.
 - A user can install and run Wagon without complex setup beyond installing `rclone`.
 
 ## Future Ideas

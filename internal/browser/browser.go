@@ -21,6 +21,7 @@ type pane struct {
 	path     string
 	items    []filelist.Item
 	cursor   int
+	search   string
 	selected map[string]bool
 	err      error
 	loading  bool
@@ -50,6 +51,8 @@ type Model struct {
 	status         string
 	autoPickRemote bool
 	copying        bool
+	transfer       transferState
+	searchMode     bool
 	drivePicker    bool
 	driveCursor    int
 	driveChoices   []driveChoice
@@ -68,11 +71,24 @@ type remotesLoadedMsg struct {
 	err     error
 }
 
-type copyFinishedMsg struct {
+type copyStepFinishedMsg struct {
 	sourceIndex int
 	targetIndex int
-	count       int
+	itemIndex   int
 	err         error
+}
+
+type transferTickMsg struct{}
+
+type transferState struct {
+	sourceIndex int
+	targetIndex int
+	targetPath  string
+	targetKind  filelist.Kind
+	items       []filelist.Item
+	current     int
+	spinner     int
+	started     time.Time
 }
 
 type driveChoice struct {
@@ -80,7 +96,14 @@ type driveChoice struct {
 	path string
 }
 
+type itemRef struct {
+	index int
+	item  filelist.Item
+}
+
 var (
+	spinnerFrames = []string{"|", "/", "-", "\\"}
+
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("15")).
@@ -105,6 +128,11 @@ var (
 
 	selectedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42"))
+
+	transferStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("15")).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
 
 	cursorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("15")).
@@ -164,7 +192,7 @@ func NewModel(ctx context.Context, client rclone.Client, options Options) Model 
 				loading:  true,
 			},
 		},
-		status: "Tab switches panes. Enter opens folders. Space selects. v chooses a drive.",
+		status: "Tab switches panes. / searches. Enter opens folders. v chooses a drive.",
 	}
 
 	return model
@@ -203,17 +231,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.panes[1].path = msg.remotes[0]
 		return m, m.loadPane(1)
 
-	case copyFinishedMsg:
-		m.copying = false
+	case transferTickMsg:
+		if !m.copying {
+			return m, nil
+		}
+		m.transfer.spinner = (m.transfer.spinner + 1) % len(spinnerFrames)
+		return m, transferTick()
+
+	case copyStepFinishedMsg:
 		if msg.err != nil {
+			m.copying = false
 			m.status = "Copy failed: " + msg.err.Error()
 			return m, nil
 		}
 
+		total := len(m.transfer.items)
+		nextIndex := msg.itemIndex + 1
+		if nextIndex < total {
+			m.transfer.current = nextIndex
+			currentItem := m.transfer.items[nextIndex]
+			m.status = fmt.Sprintf("Copying %d/%d: %s", nextIndex+1, total, currentItem.Name)
+			return m, m.copyTransferItem(nextIndex)
+		}
+
+		m.copying = false
+		m.transfer.current = total
 		m.panes[msg.sourceIndex].selected = map[string]bool{}
 		m.panes[msg.targetIndex].loading = true
 		m.panes[msg.targetIndex].err = nil
-		m.status = fmt.Sprintf("Copied %d item(s).", msg.count)
+		m.status = fmt.Sprintf("Copied %d item(s).", total)
 		return m, m.loadPane(msg.targetIndex)
 
 	case paneLoadedMsg:
@@ -227,12 +273,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.path = msg.path
 			p.items = msg.items
 			p.cursor = clamp(p.cursor, 0, len(p.items)-1)
+			syncCursorWithFilter(p)
 		}
 		return m, nil
 
 	case tea.KeyMsg:
 		if m.drivePicker {
 			return m.updateDrivePicker(msg)
+		}
+		if m.searchMode {
+			return m.updateSearch(msg)
 		}
 
 		switch msg.String() {
@@ -260,6 +310,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "A":
 			m.clearSelection()
 			return m, nil
+		case "/":
+			m.startSearch()
+			return m, nil
+		case "esc":
+			m.clearSearch()
+			return m, nil
 		case "r":
 			m.status = "Refreshing " + m.activePane().title + "."
 			return m, m.loadPane(m.active)
@@ -272,7 +328,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "TUI sync is next. For now use: wagon sync <source> <destination>"
 			return m, nil
 		case "?":
-			m.status = "Keys: Tab pane, Enter open, Space select, c copy, v drives, a all, A clear, r refresh, q quit."
+			m.status = "Keys: / search, Tab pane, Enter open, Space select, c copy, v drives, a all, A clear, r refresh, q quit."
 			return m, nil
 		}
 	}
@@ -302,8 +358,14 @@ func (m Model) View() string {
 	right := m.renderPane(1, paneWidth, listHeight)
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 
+	transfer := m.renderTransfer(width)
 	footer := m.renderFooter(width)
-	return strings.Join([]string{header, body, footer}, "\n")
+	parts := []string{header, body}
+	if transfer != "" {
+		parts = append(parts, transfer)
+	}
+	parts = append(parts, footer)
+	return strings.Join(parts, "\n")
 }
 
 func (m Model) renderPane(index int, width int, height int) string {
@@ -330,19 +392,41 @@ func (m Model) renderPane(index int, width int, height int) string {
 		return style.Render(strings.Join(lines, "\n"))
 	}
 
+	if p.search != "" || (m.searchMode && index == m.active) {
+		searchLine := "Search: " + p.search
+		if m.searchMode && index == m.active {
+			searchLine += "_"
+		}
+		lines = append(lines, mutedStyle.Render(truncate(searchLine, width-4)))
+	}
+
+	itemRefs := filteredItemRefs(p)
+	if len(itemRefs) == 0 {
+		lines = append(lines, "", mutedStyle.Render("No matches"))
+		return style.Render(strings.Join(lines, "\n"))
+	}
+
 	visibleRows := max(3, height-5)
-	start := scrollStart(p.cursor, len(p.items), visibleRows)
-	end := min(len(p.items), start+visibleRows)
+	if p.search != "" || (m.searchMode && index == m.active) {
+		visibleRows = max(3, visibleRows-1)
+	}
+	cursorPos := cursorRefPosition(p, itemRefs)
+	start := scrollStart(cursorPos, len(itemRefs), visibleRows)
+	end := min(len(itemRefs), start+visibleRows)
 
 	lines = append(lines, mutedStyle.Render(fitColumns("  Name", "Size", "Date", width-4)))
 	for row := start; row < end; row++ {
-		item := p.items[row]
-		line := m.renderItemLine(p, item, row == p.cursor, width-4)
+		ref := itemRefs[row]
+		line := m.renderItemLine(p, ref.item, ref.index == p.cursor, width-4)
 		lines = append(lines, line)
 	}
 
 	selectedCount := countSelected(p)
-	lines = append(lines, "", mutedStyle.Render(fmt.Sprintf("%d selected", selectedCount)))
+	summary := fmt.Sprintf("%d selected", selectedCount)
+	if p.search != "" {
+		summary += fmt.Sprintf(" - %d match(es)", len(itemRefs))
+	}
+	lines = append(lines, "", mutedStyle.Render(summary))
 	return style.Render(strings.Join(lines, "\n"))
 }
 
@@ -378,13 +462,37 @@ func (m Model) renderItemLine(p pane, item filelist.Item, cursor bool, width int
 func (m Model) renderFooter(width int) string {
 	active := m.activePane()
 	selection := fmt.Sprintf("%s: %d selected", active.title, countSelected(*active))
-	help := "[Tab] pane  [Enter] open  [Space] select  [c] copy  [v] drives  [a] all  [A] clear  [r] refresh  [?] help  [q] quit"
+	help := "[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [v] drives  [a] all  [A] clear  [r] refresh  [?] help  [q] quit"
 	lines := []string{
 		mutedStyle.Render(truncate(selection, width)),
 		truncate(m.status, width),
 		mutedStyle.Render(truncate(help, width)),
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderTransfer(width int) string {
+	if !m.copying || len(m.transfer.items) == 0 {
+		return ""
+	}
+
+	current := clamp(m.transfer.current, 0, len(m.transfer.items)-1)
+	item := m.transfer.items[current]
+	frame := spinnerFrames[m.transfer.spinner%len(spinnerFrames)]
+	elapsed := time.Since(m.transfer.started).Round(time.Second)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+
+	label := fmt.Sprintf("%s Copying item %d/%d: %s -> %s  elapsed %s",
+		frame,
+		current+1,
+		len(m.transfer.items),
+		item.Name,
+		m.transfer.targetPath,
+		elapsed,
+	)
+	return transferStyle.Width(max(0, width-2)).Render(truncate(label, max(0, width-4)))
 }
 
 func (m Model) renderDrivePicker(width int, height int) string {
@@ -424,11 +532,14 @@ func (m Model) renderDrivePicker(width int, height int) string {
 
 func (m *Model) moveCursor(delta int) {
 	p := m.activePane()
-	if len(p.items) == 0 {
+	refs := filteredItemRefs(*p)
+	if len(refs) == 0 {
 		p.cursor = 0
 		return
 	}
-	p.cursor = clamp(p.cursor+delta, 0, len(p.items)-1)
+	pos := cursorRefPosition(*p, refs)
+	pos = clamp(pos+delta, 0, len(refs)-1)
+	p.cursor = refs[pos].index
 }
 
 func (m *Model) openCurrent() tea.Cmd {
@@ -437,7 +548,11 @@ func (m *Model) openCurrent() tea.Cmd {
 		return nil
 	}
 
-	item := p.items[p.cursor]
+	item, ok := currentVisibleItem(*p)
+	if !ok {
+		m.status = "No matching item to open."
+		return nil
+	}
 	if !item.IsDir {
 		m.status = "Only folders can be opened in the browser."
 		return nil
@@ -445,6 +560,8 @@ func (m *Model) openCurrent() tea.Cmd {
 
 	p.path = item.Path
 	p.cursor = 0
+	p.search = ""
+	m.searchMode = false
 	p.selected = map[string]bool{}
 	p.loading = true
 	p.err = nil
@@ -467,6 +584,8 @@ func (m *Model) openParent() tea.Cmd {
 		p.path = parent
 	}
 	p.cursor = 0
+	p.search = ""
+	m.searchMode = false
 	p.selected = map[string]bool{}
 	p.loading = true
 	p.err = nil
@@ -478,7 +597,11 @@ func (m *Model) toggleSelection() {
 	if p.loading || p.err != nil || len(p.items) == 0 {
 		return
 	}
-	item := p.items[p.cursor]
+	item, ok := currentVisibleItem(*p)
+	if !ok {
+		m.status = "No matching item to select."
+		return
+	}
 	if item.IsParent {
 		return
 	}
@@ -493,7 +616,8 @@ func (m *Model) toggleSelection() {
 
 func (m *Model) selectAll() {
 	p := m.activePane()
-	for _, item := range p.items {
+	for _, ref := range filteredItemRefs(*p) {
+		item := ref.item
 		if !item.IsParent {
 			p.selected[item.Path] = true
 		}
@@ -507,9 +631,81 @@ func (m *Model) clearSelection() {
 	m.status = "Selection cleared."
 }
 
+func (m *Model) startSearch() {
+	p := m.activePane()
+	p.search = ""
+	m.searchMode = true
+	m.status = "Type to filter this pane. Enter opens a match. Esc clears search."
+}
+
+func (m Model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.clearSearch()
+		return m, nil
+	case "enter":
+		m.searchMode = false
+		return m, m.openCurrent()
+	case "up", "k":
+		m.moveCursor(-1)
+		return m, nil
+	case "down", "j":
+		m.moveCursor(1)
+		return m, nil
+	case "backspace", "ctrl+h":
+		p := m.activePane()
+		p.search = dropLastRune(p.search)
+		syncCursorWithFilter(p)
+		m.updateSearchStatus()
+		return m, nil
+	case "tab":
+		m.searchMode = false
+		m.active = 1 - m.active
+		m.status = "Search kept on the previous pane."
+		return m, nil
+	}
+
+	if len(msg.Runes) > 0 {
+		p := m.activePane()
+		p.search += string(msg.Runes)
+		syncCursorWithFilter(p)
+		m.updateSearchStatus()
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m *Model) clearSearch() {
+	p := m.activePane()
+	if p.search == "" {
+		m.searchMode = false
+		m.status = "Search closed."
+		return
+	}
+
+	p.search = ""
+	m.searchMode = false
+	syncCursorWithFilter(p)
+	m.status = "Search cleared."
+}
+
+func (m *Model) updateSearchStatus() {
+	p := m.activePane()
+	matches := len(filteredItemRefs(*p))
+	if p.search == "" {
+		m.status = "Type to filter this pane. Enter opens a match. Esc clears search."
+		return
+	}
+	m.status = fmt.Sprintf("Search: %s - %d match(es)", p.search, matches)
+}
+
 func (m *Model) openDrivePicker() {
 	choices, err := localDriveChoices()
 	m.drivePicker = true
+	m.searchMode = false
 	m.driveCursor = 0
 	m.driveChoices = choices
 	m.driveErr = err
@@ -545,6 +741,7 @@ func (m Model) updateDrivePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.title = titleForKind(filelist.Local)
 		p.path = choice.path
 		p.cursor = 0
+		p.search = ""
 		p.selected = map[string]bool{}
 		p.loading = true
 		p.err = nil
@@ -586,32 +783,54 @@ func (m *Model) copyCurrentSelection() tea.Cmd {
 		return nil
 	}
 
-	client := m.client
-	ctx := m.ctx
 	targetPath := target.path
 	targetKind := target.kind
 	m.copying = true
-	m.status = fmt.Sprintf("Copying %d item(s) to %s...", len(items), targetPath)
+	m.transfer = transferState{
+		sourceIndex: sourceIndex,
+		targetIndex: targetIndex,
+		targetPath:  targetPath,
+		targetKind:  targetKind,
+		items:       items,
+		current:     0,
+		started:     time.Now(),
+	}
+	m.status = fmt.Sprintf("Copying 1/%d: %s", len(items), items[0].Name)
+
+	return tea.Batch(m.copyTransferItem(0), transferTick())
+}
+
+func (m Model) copyTransferItem(itemIndex int) tea.Cmd {
+	client := m.client
+	ctx := m.ctx
+	transfer := m.transfer
 
 	return func() tea.Msg {
-		for _, item := range items {
-			destination := filelist.Join(targetKind, targetPath, item.Name)
-			if _, err := client.CopyItem(ctx, item.Path, destination, item.IsDir); err != nil {
-				return copyFinishedMsg{
-					sourceIndex: sourceIndex,
-					targetIndex: targetIndex,
-					count:       len(items),
-					err:         err,
-				}
+		if itemIndex < 0 || itemIndex >= len(transfer.items) {
+			return copyStepFinishedMsg{
+				sourceIndex: transfer.sourceIndex,
+				targetIndex: transfer.targetIndex,
+				itemIndex:   itemIndex,
+				err:         fmt.Errorf("copy item index %d out of range", itemIndex),
 			}
 		}
 
-		return copyFinishedMsg{
-			sourceIndex: sourceIndex,
-			targetIndex: targetIndex,
-			count:       len(items),
+		item := transfer.items[itemIndex]
+		destination := filelist.Join(transfer.targetKind, transfer.targetPath, item.Name)
+		_, err := client.CopyItem(ctx, item.Path, destination, item.IsDir)
+		return copyStepFinishedMsg{
+			sourceIndex: transfer.sourceIndex,
+			targetIndex: transfer.targetIndex,
+			itemIndex:   itemIndex,
+			err:         err,
 		}
 	}
+}
+
+func transferTick() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
+		return transferTickMsg{}
+	})
 }
 
 func (m Model) loadPane(index int) tea.Cmd {
@@ -731,13 +950,69 @@ func countSelected(p pane) int {
 	return len(p.selected)
 }
 
+func filteredItemRefs(p pane) []itemRef {
+	query := strings.ToLower(strings.TrimSpace(p.search))
+	refs := make([]itemRef, 0, len(p.items))
+	for index, item := range p.items {
+		if query != "" {
+			if item.IsParent {
+				continue
+			}
+			if !strings.Contains(strings.ToLower(item.Name), query) {
+				continue
+			}
+		}
+		refs = append(refs, itemRef{index: index, item: item})
+	}
+	return refs
+}
+
+func cursorRefPosition(p pane, refs []itemRef) int {
+	for index, ref := range refs {
+		if ref.index == p.cursor {
+			return index
+		}
+	}
+	return 0
+}
+
+func syncCursorWithFilter(p *pane) {
+	refs := filteredItemRefs(*p)
+	if len(refs) == 0 {
+		p.cursor = 0
+		return
+	}
+	for _, ref := range refs {
+		if ref.index == p.cursor {
+			return
+		}
+	}
+	p.cursor = refs[0].index
+}
+
+func currentVisibleItem(p pane) (filelist.Item, bool) {
+	refs := filteredItemRefs(p)
+	if len(refs) == 0 {
+		return filelist.Item{}, false
+	}
+	for _, ref := range refs {
+		if ref.index == p.cursor {
+			return ref.item, true
+		}
+	}
+	return refs[0].item, true
+}
+
 func copyItems(p pane) []filelist.Item {
 	if len(p.items) == 0 {
 		return nil
 	}
 
 	if len(p.selected) == 0 {
-		item := p.items[p.cursor]
+		item, ok := currentVisibleItem(p)
+		if !ok {
+			return nil
+		}
 		if item.IsParent {
 			return nil
 		}
@@ -751,6 +1026,14 @@ func copyItems(p pane) []filelist.Item {
 		}
 	}
 	return items
+}
+
+func dropLastRune(value string) string {
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return ""
+	}
+	return string(runes[:len(runes)-1])
 }
 
 func sameLocation(left pane, right pane) bool {

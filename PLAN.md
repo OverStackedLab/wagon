@@ -24,13 +24,15 @@ Implemented:
 - `--right` for local or remote right-pane paths.
 - `--remote` as a shortcut for opening an `rclone` remote.
 - Local drive picker with `v`, listing `/`, home, and mounted drives under `/Volumes`.
+- Incremental per-pane search with `/`, live filtering, Enter-open, and Esc-clear.
 - Multi-select with `Space`, `a`, and `A`.
 - Browser copy with `c` between local and remote locations through `rclone`.
+- Browser copy progress strip with spinner, item count, filename, destination, and elapsed time.
 - CLI sync dry-run by default, with `--apply` and `--yes`.
 
 Not yet implemented:
 
-- TUI move, delete, mkdir, search, sync, transfer queue, cancel/retry, saved jobs, packaging.
+- TUI byte-level transfer progress, move, delete, mkdir, sync, transfer queue, cancel/retry, saved jobs, packaging.
 
 ## Guiding Product Principles
 
@@ -79,6 +81,7 @@ Acceptance:
 - Right pane defaults to a local folder.
 - User can choose a mounted drive from inside the UI.
 - User can still browse an `rclone` remote with `--remote` or `--right remote:`.
+- User can filter the active pane as they type and open a matching folder with `Enter`.
 - The app handles empty folders, inaccessible folders, and missing remotes gracefully.
 
 ## Milestone 2: Selection Model
@@ -115,6 +118,7 @@ Acceptance:
 - User can move one file, many selected files, or a folder.
 - Transfer failures are visible and retryable.
 - Local-to-local copies work for normal folders and external drives.
+- Browser copy shows visible item-level progress while running.
 
 ## Milestone 4: Sync with Dry Run
 
@@ -221,4 +225,4 @@ Start with:
 5. Multi-select model
 6. Browser copy between panes
 
-This first slice is implemented. The next useful slice is search plus a visible transfer queue for browser copy operations.
+This first slice is implemented. The next useful slice is a transfer queue with byte-level `rclone` progress for browser copy operations.

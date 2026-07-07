@@ -58,9 +58,10 @@ wagon sync <source> <destination> --apply --yes
 - `Enter`: open folder
 - `Backspace`: go up
 - `Space`: select or unselect item
+- `/`: search/filter the active pane as you type
 - `c`: copy selected/current item into the opposite pane
 - `v`: choose a local drive or location for the active pane
-- `Esc`: close the drive picker
+- `Esc`: clear search or close the drive picker
 - `a`: select all
 - `A`: clear selection
 - `r`: refresh active pane
@@ -68,5 +69,9 @@ wagon sync <source> <destination> --apply --yes
 - `q`: quit
 
 The browser supports copying between any two loaded locations: local-to-local, local-to-remote, remote-to-local, and remote-to-remote. For an external drive, press `v` inside the UI and choose it from `/Volumes`, or open it directly with a path like `/Volumes/DriveName`.
+
+Search is incremental: press `/`, type part of a file or folder name, and the active pane filters immediately. `Enter` opens the highlighted match, arrow keys move through matches, and `Esc` clears the search.
+
+Browser copy shows an item-level progress strip while copying, including a spinner, current item count, current filename, destination, and elapsed time. Byte-level `rclone` progress is still available in CLI copy output and is planned for the TUI transfer queue.
 
 Sync is still available as a CLI command while the transfer queue and in-browser sync actions are built out.
