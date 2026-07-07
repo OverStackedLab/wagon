@@ -1,0 +1,30 @@
+# Build artifacts
+bin/
+dist/
+build/
+out/
+
+# Go test and coverage output
+*.test
+*.prof
+coverage.out
+coverage.html
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Logs and temp files
+*.log
+*.tmp
+tmp/
+
+# macOS
+.DS_Store
+
+# Editor/project metadata
+.idea/
+.vscode/
+*.swp
+*.swo
