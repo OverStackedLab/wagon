@@ -2,6 +2,8 @@
 
 Wagon is a terminal file manager for `rclone`. It starts with a two-pane browser for local files, external drives, and cloud remotes, plus safe command wrappers for common transfer operations.
 
+![Wagon terminal UI screenshot](docs/screenshot.svg)
+
 ## Requirements
 
 - macOS or another Unix-like shell
@@ -29,8 +31,16 @@ You can also build a local binary:
 
 ```bash
 go build -o bin/wagon ./cmd/wagon
-bin/wagon doctor
-bin/wagon browse
+./bin/wagon doctor
+./bin/wagon browse
+```
+
+To make `wagon` work as a shell command, install it into a directory on your `PATH`:
+
+```bash
+make install
+wagon doctor
+wagon browse
 ```
 
 ## Commands
