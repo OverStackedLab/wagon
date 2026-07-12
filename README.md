@@ -18,10 +18,11 @@ rclone config # optional, for cloud remotes
 
 ## Install With Homebrew
 
-After the first release is published, Wagon will install from the OverStackedLab tap:
+Wagon will install from the OverStackedLab tap:
 
 ```bash
-brew install OverStackedLab/tap/wagon
+brew tap OverStackedLab/tap
+brew install wagon
 ```
 
 ## Run Locally
@@ -80,8 +81,9 @@ wagon sync <source> <destination> --apply --yes
 - `c`: copy selected/current item into the opposite pane
 - `p`: pause or resume the active transfer queue after the current item
 - `z`: calculate the size of the selected/current folder or unknown-size item
+- `Z`: analyze sizes for all visible unknown-size items in the active pane
 - `v`: choose a local drive or location for the active pane
-- `Esc`: clear search or close the drive picker
+- `Esc`: clear search, cancel size analysis, or close the drive picker
 - `a`: select all
 - `A`: clear selection
 - `r`: refresh active pane
@@ -94,7 +96,7 @@ Search is incremental: press `/`, type part of a file or folder name, and the ac
 
 Browser copy shows an item-level progress strip while copying, including a spinner, current item count, current filename, current item size, known batch size, destination, and elapsed time. Press `p` during a copy to pause the queue after the current item finishes, then press `p` again to resume. Byte-level `rclone` progress is still available in CLI copy output and is planned for the TUI transfer queue.
 
-Folder sizes are calculated on demand because recursive local walks and remote `rclone size` calls can be slow. Folders show `?` until you select one or move the cursor to it and press `z`.
+Folder sizes are calculated on demand because recursive local walks and remote `rclone size` calls can be slow. Folders show `?` until you select one or move the cursor to it and press `z`. Press `Z` to analyze every visible unknown-size item in the active pane without selecting items first. Size analysis shows a spinner strip with the current item and elapsed time. If an analysis is slow, press `Esc` to cancel it, or press `z`/`Z` again to restart with a new target.
 
 Sync is still available as a CLI command while the transfer queue and in-browser sync actions are built out.
 

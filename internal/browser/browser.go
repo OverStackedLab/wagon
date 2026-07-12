@@ -54,6 +54,7 @@ type Model struct {
 	transfer       transferState
 	sizing         bool
 	sizeJob        sizeState
+	nextSizeJobID  int
 	searchMode     bool
 	drivePicker    bool
 	driveCursor    int
@@ -81,6 +82,7 @@ type copyStepFinishedMsg struct {
 }
 
 type sizeStepFinishedMsg struct {
+	jobID     int
 	paneIndex int
 	paneKind  filelist.Kind
 	panePath  string
@@ -92,6 +94,8 @@ type sizeStepFinishedMsg struct {
 }
 
 type transferTickMsg struct{}
+
+type sizeTickMsg struct{}
 
 type transferState struct {
 	sourceIndex    int
@@ -107,13 +111,17 @@ type transferState struct {
 }
 
 type sizeState struct {
+	id        int
 	paneIndex int
 	panePath  string
 	paneKind  filelist.Kind
 	items     []filelist.Item
 	current   int
 	failed    int
+	spinner   int
 	started   time.Time
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 type driveChoice struct {
@@ -263,6 +271,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.transfer.spinner = (m.transfer.spinner + 1) % len(spinnerFrames)
 		return m, transferTick()
 
+	case sizeTickMsg:
+		if !m.sizing {
+			return m, nil
+		}
+		m.sizeJob.spinner = (m.sizeJob.spinner + 1) % len(spinnerFrames)
+		return m, sizeTick()
+
 	case copyStepFinishedMsg:
 		if msg.err != nil {
 			m.copying = false
@@ -297,8 +312,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.sizing {
 			return m, nil
 		}
+		if msg.jobID != m.sizeJob.id {
+			return m, nil
+		}
 		if !m.matchesSizeJob(msg) {
-			m.sizing = false
+			m.stopSizeJob()
 			m.status = "Size calculation stopped because the pane changed."
 			return m, nil
 		}
@@ -323,6 +341,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.sizing = false
 		m.sizeJob.current = total
+		m.clearSizeJobCancel()
 		if m.sizeJob.failed > 0 {
 			m.status = fmt.Sprintf("Sized %d item(s), %d failed.", total-m.sizeJob.failed, m.sizeJob.failed)
 			return m, nil
@@ -382,6 +401,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.startSearch()
 			return m, nil
 		case "esc":
+			if m.sizing {
+				m.stopSizeJob()
+				m.status = "Size calculation canceled."
+				return m, nil
+			}
 			m.clearSearch()
 			return m, nil
 		case "r":
@@ -393,6 +417,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.toggleTransferPause()
 		case "z":
 			return m, m.sizeCurrentSelection()
+		case "Z":
+			return m, m.sizeVisibleItems()
 		case "v":
 			m.openDrivePicker()
 			return m, nil
@@ -400,7 +426,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "TUI sync is next. For now use: wagon sync <source> <destination>"
 			return m, nil
 		case "?":
-			m.status = "Keys: / search, Tab pane, Enter open, Space select, c copy, p pause/resume, z size, v drives, a all, A clear, r refresh, q quit."
+			m.status = "Keys: / search, Tab pane, Enter open, Space select, c copy, p pause/resume, z size, Z analyze, Esc cancel, v drives, a all, A clear, r refresh, q quit."
 			return m, nil
 		}
 	}
@@ -431,10 +457,14 @@ func (m Model) View() string {
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 
 	transfer := m.renderTransfer(width)
+	sizing := m.renderSizeAnalysis(width)
 	footer := m.renderFooter(width)
 	parts := []string{header, body}
 	if transfer != "" {
 		parts = append(parts, transfer)
+	}
+	if sizing != "" {
+		parts = append(parts, sizing)
 	}
 	parts = append(parts, footer)
 	return strings.Join(parts, "\n")
@@ -534,7 +564,7 @@ func (m Model) renderItemLine(p pane, item filelist.Item, cursor bool, width int
 func (m Model) renderFooter(width int) string {
 	active := m.activePane()
 	selection := fmt.Sprintf("%s: %d selected", active.title, countSelected(*active))
-	help := "[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [p] pause  [z] size  [v] drives  [q] quit"
+	help := "[/] search  [Tab] pane  [Enter] open  [c] copy  [p] pause  [z] size  [Z] analyze  [v] drives  [q] quit"
 	lines := []string{
 		mutedStyle.Render(truncate(selection, width)),
 		truncate(m.status, width),
@@ -571,6 +601,29 @@ func (m Model) renderTransfer(width int) string {
 		item.Name,
 		transferSizeSummary(item, m.transfer.items),
 		m.transfer.targetPath,
+		elapsed,
+	)
+	return transferStyle.Width(max(0, width-2)).Render(truncate(label, max(0, width-4)))
+}
+
+func (m Model) renderSizeAnalysis(width int) string {
+	if !m.sizing || len(m.sizeJob.items) == 0 {
+		return ""
+	}
+
+	current := clamp(m.sizeJob.current, 0, len(m.sizeJob.items)-1)
+	item := m.sizeJob.items[current]
+	frame := spinnerFrames[m.sizeJob.spinner%len(spinnerFrames)]
+	elapsed := time.Since(m.sizeJob.started).Round(time.Second)
+	if elapsed < 0 {
+		elapsed = 0
+	}
+
+	label := fmt.Sprintf("%s Analyzing sizes %d/%d: %s  elapsed %s  Esc cancels",
+		frame,
+		current+1,
+		len(m.sizeJob.items),
+		item.Name,
 		elapsed,
 	)
 	return transferStyle.Width(max(0, width-2)).Render(truncate(label, max(0, width-4)))
@@ -938,8 +991,7 @@ func (m Model) copyTransferItem(itemIndex int) tea.Cmd {
 
 func (m *Model) sizeCurrentSelection() tea.Cmd {
 	if m.sizing {
-		m.status = "Size calculation already running."
-		return nil
+		m.stopSizeJob()
 	}
 
 	p := m.activePane()
@@ -954,27 +1006,79 @@ func (m *Model) sizeCurrentSelection() tea.Cmd {
 		return nil
 	}
 
+	m.startSizeJob(*p, items)
+	m.status = fmt.Sprintf("Sizing 1/%d: %s", len(items), items[0].Name)
+	return tea.Batch(m.sizeTransferItem(0), sizeTick())
+}
+
+func (m *Model) sizeVisibleItems() tea.Cmd {
+	if m.sizing {
+		m.stopSizeJob()
+	}
+
+	p := m.activePane()
+	if p.loading || p.err != nil {
+		m.status = "Pane is not ready."
+		return nil
+	}
+
+	items := visibleSizeItems(*p)
+	if len(items) == 0 {
+		m.status = "Visible item sizes are already known."
+		return nil
+	}
+
+	m.startSizeJob(*p, items)
+	m.status = fmt.Sprintf("Analyzing sizes 1/%d: %s", len(items), items[0].Name)
+	return tea.Batch(m.sizeTransferItem(0), sizeTick())
+}
+
+func (m *Model) startSizeJob(p pane, items []filelist.Item) {
+	baseCtx := m.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	m.nextSizeJobID++
+	jobCtx, cancel := context.WithCancel(baseCtx)
 	m.sizing = true
 	m.sizeJob = sizeState{
+		id:        m.nextSizeJobID,
 		paneIndex: m.active,
 		panePath:  p.path,
 		paneKind:  p.kind,
 		items:     items,
 		current:   0,
 		started:   time.Now(),
+		ctx:       jobCtx,
+		cancel:    cancel,
 	}
-	m.status = fmt.Sprintf("Sizing 1/%d: %s", len(items), items[0].Name)
-	return m.sizeTransferItem(0)
+}
+
+func (m *Model) stopSizeJob() {
+	m.clearSizeJobCancel()
+	m.sizing = false
+	m.sizeJob = sizeState{}
+}
+
+func (m *Model) clearSizeJobCancel() {
+	if m.sizeJob.cancel != nil {
+		m.sizeJob.cancel()
+		m.sizeJob.cancel = nil
+	}
 }
 
 func (m Model) sizeTransferItem(itemIndex int) tea.Cmd {
 	client := m.client
-	ctx := m.ctx
 	job := m.sizeJob
+	ctx := job.ctx
+	if ctx == nil {
+		ctx = m.ctx
+	}
 
 	return func() tea.Msg {
 		if itemIndex < 0 || itemIndex >= len(job.items) {
 			return sizeStepFinishedMsg{
+				jobID:     job.id,
 				paneIndex: job.paneIndex,
 				paneKind:  job.paneKind,
 				panePath:  job.panePath,
@@ -998,6 +1102,7 @@ func (m Model) sizeTransferItem(itemIndex int) tea.Cmd {
 		}
 
 		return sizeStepFinishedMsg{
+			jobID:     job.id,
 			paneIndex: job.paneIndex,
 			paneKind:  job.paneKind,
 			panePath:  job.panePath,
@@ -1024,6 +1129,12 @@ func (m Model) matchesSizeJob(msg sizeStepFinishedMsg) bool {
 func transferTick() tea.Cmd {
 	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
 		return transferTickMsg{}
+	})
+}
+
+func sizeTick() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg {
+		return sizeTickMsg{}
 	})
 }
 
@@ -1238,6 +1349,22 @@ func sizeItems(p pane) []filelist.Item {
 	items := make([]filelist.Item, 0, len(p.selected))
 	for _, item := range p.items {
 		if p.selected[item.Path] && !item.IsParent && !item.SizeKnown {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func visibleSizeItems(p pane) []filelist.Item {
+	if len(p.items) == 0 {
+		return nil
+	}
+
+	refs := filteredItemRefs(p)
+	items := make([]filelist.Item, 0, len(refs))
+	for _, ref := range refs {
+		item := ref.item
+		if !item.IsParent && !item.SizeKnown {
 			items = append(items, item)
 		}
 	}

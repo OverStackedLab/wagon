@@ -100,6 +100,7 @@ renderPane          renders one file pane
 renderTransfer      renders copy progress
 startSearch         starts incremental search
 sizeCurrentSelection calculates selected/current unknown sizes
+sizeVisibleItems     calculates visible unknown sizes without selection
 copyCurrentSelection starts browser copy
 toggleTransferPause pauses/resumes copy queues between items
 ```
@@ -301,6 +302,16 @@ Update
   -> sizeCurrentSelection
     -> chooses selected unknown-size items, or the current unknown-size item
     -> starts sizeTransferItem(0)
+```
+
+When you press `Z`, Wagon skips selection and analyzes every visible unknown-size item in the active pane. If a search filter is active, only matching visible items are analyzed.
+
+Starting a new `z` or `Z` size job cancels any active size job first. Size jobs have unique IDs, so late results from canceled jobs are ignored. Pressing `Esc` cancels the active size job without starting a new one.
+
+While a size job runs, `sizeTick` updates the spinner in the size analysis strip:
+
+```text
+| Analyzing sizes 3/12: Photos  elapsed 4s  Esc cancels
 ```
 
 For local paths:

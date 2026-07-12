@@ -56,6 +56,8 @@ The current app is a Go CLI/TUI with these working features:
 - `c` copies the selected/current item into the opposite pane using `rclone`.
 - `p` pauses or resumes an active browser copy queue after the current item finishes.
 - `z` calculates the selected/current folder size on demand.
+- `Z` analyzes sizes for all visible unknown-size items in the active pane.
+- Size analysis shows a spinner strip with current item count, filename, elapsed time, and an `Esc` cancel hint.
 - Browser copy shows an item-level progress strip with a spinner, current item count, filename, size, destination, and elapsed time.
 - `wagon copy` supports local and remote paths, with `--dry-run`.
 - `wagon sync` is dry-run by default; `--apply` performs the sync and `--yes` skips confirmation.
@@ -82,7 +84,7 @@ Wagon                                                   rclone file manager
 
  / Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -> /Volumes/Backup  elapsed 3s
 
- [/] search   [Tab] pane   [Enter] open   [Space] select   [c] copy   [p] pause   [z] size   [v] drives
+ [/] search   [Tab] pane   [Enter] open   [c] copy   [p] pause   [z] size   [Z] analyze   [v] drives
 ```
 
 ### Drive Picker
@@ -154,8 +156,9 @@ wagon sync ~/Pictures b2:photos --apply
 - `c`: copy selected/current item into the opposite pane
 - `p`: pause or resume the active transfer queue after the current item
 - `z`: calculate the size of the selected/current folder or unknown-size item
+- `Z`: analyze sizes for all visible unknown-size items in the active pane
 - `v`: choose a local drive or location for the active pane
-- `Esc`: clear search or close the drive picker
+- `Esc`: clear search, cancel size analysis, or close the drive picker
 - `a`: select all
 - `A`: clear selection
 - `r`: refresh
@@ -174,6 +177,7 @@ wagon sync ~/Pictures b2:photos --apply
 - Browser copy operations run immediately.
 - Browser copy progress is item-level in the current TUI; byte-level progress is planned for the transfer queue.
 - Browser copy can pause between transfer items with `p`; the current `rclone` item is allowed to finish first.
+- Size analysis can be canceled with `Esc`; starting another `z` or `Z` analysis cancels the previous one.
 - Move operations require confirmation.
 - Delete operations require confirmation and should show item count.
 - CLI sync operations default to dry-run preview before execution.

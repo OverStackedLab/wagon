@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
   <title id="title">Wagon terminal file manager screenshot</title>
-  <desc id="desc">A mock terminal screenshot of Wagon with two local file panes, search, selection, and copy progress.</desc>
+  <desc id="desc">A mock terminal screenshot of Wagon with two local file panes, search, selection, copy progress, and size analysis progress.</desc>
   <rect width="960" height="560" fill="#0b1020"/>
   <rect x="36" y="34" width="888" height="492" rx="8" fill="#111827" stroke="#334155"/>
   <rect x="36" y="34" width="888" height="38" rx="8" fill="#1f2937"/>
@@ -32,9 +32,11 @@
   <text x="512" y="312" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    Backups/                   ?         Jul 01</text>
   <text x="512" y="340" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">0 selected</text>
 
-  <rect x="58" y="406" width="844" height="32" rx="4" fill="#1e293b"/>
-  <text x="78" y="427" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -&gt; /Volumes/Backup  elapsed 3s</text>
+  <rect x="58" y="398" width="844" height="30" rx="4" fill="#1e293b"/>
+  <text x="78" y="418" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -&gt; /Volumes/Backup  elapsed 3s</text>
+  <rect x="58" y="434" width="844" height="30" rx="4" fill="#1e293b"/>
+  <text x="78" y="454" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">| Analyzing sizes 3/8: Backups  elapsed 4s  Esc cancels</text>
 
-  <text x="58" y="464" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">Local: 2 selected</text>
-  <text x="58" y="488" fill="#94a3b8" font-family="Menlo, Consolas, monospace" font-size="13">[/] search  [Tab] pane  [Enter] open  [Space] select  [c] copy  [p] pause  [z] size  [v] drives  [q] quit</text>
+  <text x="58" y="486" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">Local: 2 selected</text>
+  <text x="58" y="510" fill="#94a3b8" font-family="Menlo, Consolas, monospace" font-size="13">[/] search  [Tab] pane  [Enter] open  [c] copy  [p] pause  [z] size  [Z] analyze  [v] drives  [q] quit</text>
 </svg>
