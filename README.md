@@ -102,6 +102,15 @@ Folder sizes are calculated on demand because recursive local walks and remote `
 
 Sync is still available as a CLI command while the transfer queue and in-browser sync actions are built out.
 
+## Disclaimer
+
+- **Wagon moves real files.** Always review dry-run output before running `wagon sync` with `--apply`, and keep backups of anything irreplaceable. The authors are not responsible for lost or corrupted data.
+- **Sync deletes files.** `wagon sync --apply` makes the destination mirror the source, which means files at the destination that do not exist in the source are deleted.
+- **Early-stage software.** Wagon is pre-1.0. Commands, keybindings, and behavior may change between releases, and you should expect rough edges.
+- **Not affiliated with rclone.** Wagon is an independent project and is not affiliated with or endorsed by the rclone project.
+- **Cloud costs are yours.** Transfers to or from cloud remotes can incur storage, bandwidth, or API charges from your provider.
+- **No warranty.** Wagon is provided as-is under the [MIT License](LICENSE), without warranty of any kind.
+
 ## Project Docs
 
 - [Architecture guide](docs/architecture.md)

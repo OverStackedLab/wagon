@@ -18,11 +18,11 @@
   <text x="78" y="158" fill="#e2e8f0" font-family="Menlo, Consolas, monospace" font-size="14">Local: /Users/bob/Documents</text>
   <text x="512" y="158" fill="#e2e8f0" font-family="Menlo, Consolas, monospace" font-size="14">Local: /Volumes/Backup</text>
 
-  <text x="78" y="186" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">Search: tax_</text>
+  <text x="78" y="186" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">Search: trip_</text>
   <text x="78" y="214" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">  Name                         Size      Date</text>
-  <text x="78" y="240" fill="#ffffff" font-family="Menlo, Consolas, monospace" font-size="13">&gt; x tax-2025.pdf              2.4 MB    Jul 07</text>
-  <text x="78" y="264" fill="#22c55e" font-family="Menlo, Consolas, monospace" font-size="13">  x tax-notes.md               18 KB     Jul 07</text>
-  <text x="78" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    tax-archive/               ?         Jul 06</text>
+  <text x="78" y="240" fill="#ffffff" font-family="Menlo, Consolas, monospace" font-size="13">&gt; x trip-kyoto.jpg            2.4 MB    Jul 07</text>
+  <text x="78" y="264" fill="#22c55e" font-family="Menlo, Consolas, monospace" font-size="13">  x trip-notes.md              18 KB     Jul 07</text>
+  <text x="78" y="288" fill="#cbd5e1" font-family="Menlo, Consolas, monospace" font-size="13">    trip-videos/               ?         Jul 06</text>
   <text x="78" y="340" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">2 selected - 3 match(es)</text>
 
   <text x="512" y="214" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">  Name                         Size      Date</text>
@@ -33,7 +33,7 @@
   <text x="512" y="340" fill="#64748b" font-family="Menlo, Consolas, monospace" font-size="13">0 selected</text>
 
   <rect x="58" y="398" width="844" height="30" rx="4" fill="#1e293b"/>
-  <text x="78" y="418" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: tax-2025.pdf  size 2.4 MB / 6.9 MB+?  -&gt; /Volumes/Backup  elapsed 3s</text>
+  <text x="78" y="418" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">/ Copying item 2/5: trip-kyoto.jpg  size 2.4 MB / 6.9 MB+?  -&gt; /Volumes/Backup  elapsed 3s</text>
   <rect x="58" y="434" width="844" height="30" rx="4" fill="#1e293b"/>
   <text x="78" y="454" fill="#f8fafc" font-family="Menlo, Consolas, monospace" font-size="13">| Analyzing sizes 3/8: Backups  elapsed 4s  Esc cancels</text>
 
