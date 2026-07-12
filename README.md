@@ -1,3 +1,5 @@
+<img src="docs/icon.svg" alt="Wagon icon" width="96" height="96" />
+
 # Wagon
 
 Wagon is a terminal file manager for `rclone`. It starts with a two-pane browser for local files, external drives, and cloud remotes, plus safe command wrappers for common transfer operations.

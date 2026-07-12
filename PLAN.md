@@ -35,6 +35,7 @@ Implemented:
 Not yet implemented:
 
 - TUI byte-level transfer progress, move, delete, mkdir, sync, transfer queue, cancel/retry, saved jobs, packaging.
+- Background/scheduled sync jobs, transfer queue resume (not just retry), multi-machine config sync, and a hosted status dashboard.
 
 ## Guiding Product Principles
 
@@ -147,6 +148,7 @@ Tasks:
 - Add transfer list view.
 - Add statuses: queued, running, complete, failed, canceled.
 - Add retry failed transfer.
+- Add resume for an interrupted or canceled transfer, continuing from the last completed item instead of restarting.
 - Persist recent transfer history.
 
 Acceptance:
@@ -154,6 +156,7 @@ Acceptance:
 - Long-running copies can be monitored.
 - Multiple selected items can become a visible queue.
 - User can cancel current transfer and continue working.
+- User can resume a canceled or interrupted transfer without redoing completed items.
 
 ## Milestone 6: Saved Jobs
 
@@ -186,6 +189,42 @@ Acceptance:
 - `wagon doctor` confirms setup after install.
 - Release artifacts are reproducible.
 
+## Milestone 8: Background/Scheduled Sync and Multi-Machine Config
+
+Tasks:
+
+- Add a background scheduler that can run a saved job on an interval or cron-like schedule without the TUI open.
+- Add `wagon jobs schedule "<job>" --every 1h` (or cron expression) and `wagon jobs unschedule`.
+- Run scheduled jobs via a lightweight daemon or OS scheduler integration (e.g. launchd on macOS) rather than a long-lived foreground process.
+- Add failure notifications (desktop notification and/or log file) for scheduled runs.
+- Add multi-machine config sync: let `~/.config/wagon/config.yaml` and saved jobs sync across machines through an existing configured remote, so a job created on one machine is available on another.
+- Add `wagon config push` / `wagon config pull` for explicit config sync, plus a conflict warning if both sides changed.
+
+Acceptance:
+
+- User can schedule a saved job to run automatically on a recurring basis without keeping a terminal open.
+- User is notified when a scheduled run fails.
+- User can carry saved jobs and settings to a second machine without manually recreating them.
+- Scheduled jobs respect the same dry-run/confirm safety model as interactive sync.
+
+## Potential Monetization Track: Hosted Status Dashboard
+
+This is a candidate paid add-on, not part of the free/open-source core CLI and TUI. It should stay decoupled so the local tool keeps working fully offline with no account required.
+
+Tasks:
+
+- Define an opt-in, anonymized job/run reporting format (job name, source/dest kind, start/end time, bytes moved, status) that `wagon` can optionally POST after a run.
+- Build a minimal hosted API to ingest run reports per authenticated user/API key.
+- Build a hosted web dashboard showing recent runs, schedules, and failures across all of a user's machines.
+- Add `wagon login` / `wagon logout` and an API key stored in local config to enable reporting.
+- Keep everything behind an explicit opt-in; the CLI and TUI must never require an account to browse, copy, or sync.
+
+Acceptance:
+
+- A user with the paid tier can see the status of scheduled jobs across multiple machines from a web page.
+- Reporting is fully optional; disabling it removes all network calls beyond `rclone` itself.
+- Free-tier users are unaffected and see no prompts to upgrade during normal use.
+
 ## Current Command Shape
 
 ```bash
@@ -207,6 +246,10 @@ wagon sync ~/Pictures b2:photos --apply
 wagon move ~/Downloads/archive.zip b2:archives
 wagon jobs list
 wagon jobs run "Pictures to Backblaze"
+wagon jobs schedule "Pictures to Backblaze" --every 1h
+wagon jobs unschedule "Pictures to Backblaze"
+wagon config push
+wagon config pull
 ```
 
 ## Open Questions
