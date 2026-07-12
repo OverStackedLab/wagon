@@ -23,7 +23,7 @@ func TestPlistPathIsUnderLaunchAgents(t *testing.T) {
 }
 
 func TestRenderPlist(t *testing.T) {
-	plist := RenderPlist("photos & docs", "/usr/local/bin/wagon", "/tmp/wagon.log", 90*time.Minute)
+	plist := RenderPlist("photos & docs", "/usr/local/bin/wagon", "/tmp/wagon.log", 90*time.Minute, "/opt/homebrew/bin:/usr/bin:/bin")
 
 	for _, want := range []string{
 		"<string>dev.overstacked.wagon.job.photos---docs</string>",
@@ -34,6 +34,8 @@ func TestRenderPlist(t *testing.T) {
 		"<string>--scheduled</string>",
 		"<integer>5400</integer>",
 		"<key>RunAtLoad</key>",
+		"<key>EnvironmentVariables</key>",
+		"<string>/opt/homebrew/bin:/usr/bin:/bin</string>",
 		"<string>/tmp/wagon.log</string>",
 	} {
 		if !strings.Contains(plist, want) {

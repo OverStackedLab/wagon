@@ -45,8 +45,9 @@ func IsScheduled(jobName string) bool {
 
 // RenderPlist builds the LaunchAgent XML that runs the job headlessly on an
 // interval. launchd-level output (for example panics) goes to the same log
-// the runner appends to.
-func RenderPlist(jobName string, wagonPath string, logPath string, every time.Duration) string {
+// the runner appends to. pathEnv is required because launchd agents get a
+// minimal PATH that would not include Homebrew's rclone.
+func RenderPlist(jobName string, wagonPath string, logPath string, every time.Duration, pathEnv string) string {
 	programArgs := []string{wagonPath, "jobs", "run", jobName, "--scheduled"}
 
 	var b strings.Builder
@@ -59,12 +60,27 @@ func RenderPlist(jobName string, wagonPath string, logPath string, every time.Du
 		fmt.Fprintf(&b, "\t\t<string>%s</string>\n", xmlEscape(arg))
 	}
 	b.WriteString("\t</array>\n")
+	if pathEnv != "" {
+		b.WriteString("\t<key>EnvironmentVariables</key>\n\t<dict>\n")
+		fmt.Fprintf(&b, "\t\t<key>PATH</key>\n\t\t<string>%s</string>\n", xmlEscape(pathEnv))
+		b.WriteString("\t</dict>\n")
+	}
 	fmt.Fprintf(&b, "\t<key>StartInterval</key>\n\t<integer>%d</integer>\n", int(every.Seconds()))
 	b.WriteString("\t<key>RunAtLoad</key>\n\t<false/>\n")
 	fmt.Fprintf(&b, "\t<key>StandardOutPath</key>\n\t<string>%s</string>\n", xmlEscape(logPath))
 	fmt.Fprintf(&b, "\t<key>StandardErrorPath</key>\n\t<string>%s</string>\n", xmlEscape(logPath))
 	b.WriteString("</dict>\n</plist>\n")
 	return b.String()
+}
+
+// pathEnvForAgent builds the PATH a scheduled run needs: rclone's directory
+// resolved from the current session's PATH, plus the system defaults.
+func pathEnvForAgent() (string, error) {
+	rclonePath, err := exec.LookPath("rclone")
+	if err != nil {
+		return "", fmt.Errorf("rclone was not found on PATH; scheduled runs need it: %w", err)
+	}
+	return filepath.Dir(rclonePath) + ":/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", nil
 }
 
 // Install writes the LaunchAgent plist and loads it into the user's launchd
@@ -78,10 +94,14 @@ func Install(ctx context.Context, jobName string, wagonPath string, logPath stri
 	if err != nil {
 		return "", err
 	}
+	pathEnv, err := pathEnvForAgent()
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", fmt.Errorf("create LaunchAgents directory: %w", err)
 	}
-	if err := os.WriteFile(path, []byte(RenderPlist(jobName, wagonPath, logPath, every)), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(RenderPlist(jobName, wagonPath, logPath, every, pathEnv)), 0o644); err != nil {
 		return "", fmt.Errorf("write LaunchAgent plist: %w", err)
 	}
 
