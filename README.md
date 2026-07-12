@@ -68,9 +68,29 @@ wagon copy <source> <destination> --dry-run
 wagon sync <source> <destination>
 wagon sync <source> <destination> --apply
 wagon sync <source> <destination> --apply --yes
+wagon jobs add <name> <source> <destination> [--mode copy|sync] [--apply] [--flag <rclone-flag>]
+wagon jobs list
+wagon jobs run <name>
+wagon jobs schedule <name> --every 1h
+wagon jobs unschedule <name>
+wagon jobs remove <name>
 ```
 
 `wagon sync` is dry-run by default. Use `--apply` to perform the sync, and `--yes` to skip the confirmation prompt.
+
+## Saved Jobs and Scheduling
+
+Save a copy or sync as a named job, then run it by name or put it on a schedule:
+
+```bash
+wagon jobs add "photos to b2" ~/Pictures b2:photos --mode sync --apply
+wagon jobs run "photos to b2"
+wagon jobs schedule "photos to b2" --every 6h
+```
+
+Jobs live in `~/.config/wagon/jobs.yaml`. Sync jobs stay dry-run unless they were saved with `--apply`, so a scheduled job can never delete destination files you did not explicitly opt into. Running an `--apply` sync job interactively still asks for confirmation; pass `--yes` to skip it.
+
+Scheduling uses macOS launchd: `wagon jobs schedule` writes a LaunchAgent that runs the job in the background on the chosen interval, even with no terminal open. Scheduled runs write to a per-job log in `~/Library/Logs/wagon/`, record their outcome for `wagon jobs list`, take a per-job lock so runs never overlap, and show a desktop notification when a run fails. `wagon jobs unschedule` removes the agent. Scheduling requires macOS for now; jobs themselves work anywhere.
 
 ## Browser Keys
 

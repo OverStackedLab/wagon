@@ -44,6 +44,7 @@ func NewRootCommand() *cobra.Command {
 	root.AddCommand(newBrowseCommand())
 	root.AddCommand(newCopyCommand())
 	root.AddCommand(newSyncCommand())
+	root.AddCommand(newJobsCommand())
 
 	return root
 }

@@ -31,11 +31,13 @@ Implemented:
 - Pause/resume for browser copy queues with `p`, pausing between transfer items.
 - Browser copy progress strip with spinner, item count, filename, size, destination, and elapsed time.
 - CLI sync dry-run by default, with `--apply` and `--yes`.
+- Saved jobs with `wagon jobs add/list/remove/run`, stored in `~/.config/wagon/jobs.yaml` with run history and per-job logs.
+- Scheduled background jobs on macOS through launchd with `wagon jobs schedule/unschedule`, running headless with per-job lock files and desktop failure notifications.
 
 Not yet implemented:
 
-- TUI byte-level transfer progress, move, delete, mkdir, sync, transfer queue, cancel/retry, saved jobs, packaging.
-- Background/scheduled sync jobs, transfer queue resume (not just retry), multi-machine config sync, and a hosted status dashboard.
+- TUI byte-level transfer progress, move, delete, mkdir, sync, transfer queue, cancel/retry, TUI job picker, packaging.
+- Transfer queue resume (not just retry), Linux/systemd scheduling, multi-machine config sync, and a hosted status dashboard.
 
 ## Guiding Product Principles
 
@@ -160,18 +162,20 @@ Acceptance:
 
 ## Milestone 6: Saved Jobs
 
+Status: CLI portion implemented; the TUI job picker remains.
+
 Tasks:
 
-- Add `wagon jobs` commands.
-- Add saved copy/sync jobs.
-- Add job names, source, destination, mode, flags, and last run status.
+- Add `wagon jobs` commands. (done)
+- Add saved copy/sync jobs. (done)
+- Add job names, source, destination, mode, flags, and last run status. (done)
 - Add TUI job picker.
 
 Acceptance:
 
-- User can create a job like `Pictures to Backblaze`.
-- User can run a saved job from CLI or TUI.
-- Last run outcome is visible.
+- User can create a job like `Pictures to Backblaze`. (done)
+- User can run a saved job from CLI or TUI. (CLI done)
+- Last run outcome is visible. (done, `wagon jobs list`)
 
 ## Milestone 7: Packaging
 
@@ -191,21 +195,23 @@ Acceptance:
 
 ## Milestone 8: Background/Scheduled Sync and Multi-Machine Config
 
+Status: scheduling is implemented on macOS via launchd; multi-machine config sync remains.
+
 Tasks:
 
-- Add a background scheduler that can run a saved job on an interval or cron-like schedule without the TUI open.
-- Add `wagon jobs schedule "<job>" --every 1h` (or cron expression) and `wagon jobs unschedule`.
-- Run scheduled jobs via a lightweight daemon or OS scheduler integration (e.g. launchd on macOS) rather than a long-lived foreground process.
-- Add failure notifications (desktop notification and/or log file) for scheduled runs.
-- Add multi-machine config sync: let `~/.config/wagon/config.yaml` and saved jobs sync across machines through an existing configured remote, so a job created on one machine is available on another.
+- Add a background scheduler that can run a saved job on an interval without the TUI open. (done)
+- Add `wagon jobs schedule "<job>" --every 1h` and `wagon jobs unschedule`. (done; cron-style calendar times remain)
+- Run scheduled jobs via OS scheduler integration (launchd LaunchAgents on macOS) rather than a long-lived daemon. (done; Linux/systemd remains)
+- Add failure notifications (desktop notification plus per-job log file) for scheduled runs. (done)
+- Add multi-machine config sync: let saved jobs sync across machines through an existing configured remote, so a job created on one machine is available on another.
 - Add `wagon config push` / `wagon config pull` for explicit config sync, plus a conflict warning if both sides changed.
 
 Acceptance:
 
-- User can schedule a saved job to run automatically on a recurring basis without keeping a terminal open.
-- User is notified when a scheduled run fails.
+- User can schedule a saved job to run automatically on a recurring basis without keeping a terminal open. (done)
+- User is notified when a scheduled run fails. (done)
 - User can carry saved jobs and settings to a second machine without manually recreating them.
-- Scheduled jobs respect the same dry-run/confirm safety model as interactive sync.
+- Scheduled jobs respect the same dry-run/confirm safety model as interactive sync. (done: sync jobs stay dry-run unless saved with --apply)
 
 ## Potential Monetization Track: Hosted Status Dashboard
 
@@ -238,16 +244,18 @@ wagon copy ~/Documents gdrive:Documents
 wagon copy ~/Documents /Volumes/Backup/Documents
 wagon sync ~/Pictures b2:photos
 wagon sync ~/Pictures b2:photos --apply
+wagon jobs add "Pictures to Backblaze" ~/Pictures b2:photos --mode sync --apply
+wagon jobs list
+wagon jobs run "Pictures to Backblaze"
+wagon jobs schedule "Pictures to Backblaze" --every 1h
+wagon jobs unschedule "Pictures to Backblaze"
+wagon jobs remove "Pictures to Backblaze"
 ```
 
 ## Planned Command Shape
 
 ```bash
 wagon move ~/Downloads/archive.zip b2:archives
-wagon jobs list
-wagon jobs run "Pictures to Backblaze"
-wagon jobs schedule "Pictures to Backblaze" --every 1h
-wagon jobs unschedule "Pictures to Backblaze"
 wagon config push
 wagon config pull
 ```
