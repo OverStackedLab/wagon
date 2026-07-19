@@ -447,7 +447,7 @@ func (m Model) View() string {
 	paneWidth := max(32, (width-3)/2)
 	listHeight := max(8, height-10)
 
-	header := headerStyle.Render("Wagon") + " " + mutedStyle.Render("rclone file manager")
+	header := headerStyle.Render(wagonIcon()+"Wagon") + " " + mutedStyle.Render("rclone file manager")
 	if m.drivePicker {
 		return strings.Join([]string{header, m.renderDrivePicker(width, height-4)}, "\n")
 	}
@@ -478,7 +478,7 @@ func (m Model) renderPane(index int, width int, height int) string {
 	}
 
 	lines := []string{
-		renderPathLine(p.title, p.path, width-4),
+		renderPathLine(iconForKind(p.kind)+p.title, p.path, width-4),
 	}
 
 	if p.loading {
@@ -516,7 +516,7 @@ func (m Model) renderPane(index int, width int, height int) string {
 	start := scrollStart(cursorPos, len(itemRefs), visibleRows)
 	end := min(len(itemRefs), start+visibleRows)
 
-	lines = append(lines, mutedStyle.Render(fitColumns("  Name", "Size", "Date", width-4)))
+	lines = append(lines, mutedStyle.Render(fitColumns("   "+iconPad()+"Name", "Size", "Date", width-4)))
 	for row := start; row < end; row++ {
 		ref := itemRefs[row]
 		line := m.renderItemLine(p, ref.item, ref.index == p.cursor, width-4)
@@ -550,6 +550,7 @@ func (m Model) renderItemLine(p pane, item filelist.Item, cursor bool, width int
 	if item.IsDir && !strings.HasSuffix(name, "/") {
 		name += "/"
 	}
+	name = iconForItem(item) + name
 
 	line := fitColumns(pointer+mark+" "+name, filelist.FormatSize(item), filelist.FormatTime(item), width)
 	if p.selected[item.Path] && !item.IsParent {
@@ -654,7 +655,7 @@ func (m Model) renderDrivePicker(width int, height int) string {
 		if row == m.driveCursor {
 			prefix = "> "
 		}
-		line := truncate(prefix+choice.name+"  "+mutedStyle.Render(choice.path), pickerWidth-4)
+		line := truncate(prefix+iconForKind(filelist.Local)+choice.name+"  "+mutedStyle.Render(choice.path), pickerWidth-4)
 		if row == m.driveCursor {
 			line = cursorStyle.Render(line)
 		}
@@ -1192,14 +1193,23 @@ func fitColumns(name string, size string, date string, width int) string {
 	dateWidth := 6
 	spacing := 2
 	nameWidth := max(8, width-sizeWidth-dateWidth-spacing*2)
-	return fmt.Sprintf("%-*s  %*s  %*s",
-		nameWidth,
-		truncate(name, nameWidth),
-		sizeWidth,
-		truncate(size, sizeWidth),
-		dateWidth,
-		truncate(date, dateWidth),
-	)
+	return padRight(truncate(name, nameWidth), nameWidth) + "  " +
+		padLeft(truncate(size, sizeWidth), sizeWidth) + "  " +
+		padLeft(truncate(date, dateWidth), dateWidth)
+}
+
+func padRight(value string, width int) string {
+	if gap := width - lipgloss.Width(value); gap > 0 {
+		return value + strings.Repeat(" ", gap)
+	}
+	return value
+}
+
+func padLeft(value string, width int) string {
+	if gap := width - lipgloss.Width(value); gap > 0 {
+		return strings.Repeat(" ", gap) + value
+	}
+	return value
 }
 
 func wrapText(value string, width int) string {

@@ -12,6 +12,7 @@ Wagon is a terminal file manager for `rclone`. It starts with a two-pane browser
 - Go 1.26 or newer
 - `rclone` installed
 - An `rclone` remote configured only if you want cloud/remote browsing
+- Icons work out of the box (emoji). Set `WAGON_ICONS=nerd` for [Nerd Font](https://www.nerdfonts.com) glyphs if your terminal uses a patched font, or `WAGON_ICONS=off` for plain text
 
 ```bash
 brew install rclone go
